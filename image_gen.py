@@ -63,13 +63,56 @@ def detect_provider(model: str) -> str | None:
     return None
 
 
+_OR_QUALITY_TO_IMAGE_SIZE = {
+    "low": "1K",
+    "medium": "2K",
+    "high": "2K",
+    "auto": "2K",
+}
+
+
+def _size_to_aspect_ratio(size: str) -> str | None:
+    """Convert "WxH" or "W:H" to OpenRouter's "W:H" aspect_ratio form.
+
+    Returns None if the input cannot be parsed. Reduces by GCD for "WxH" input.
+    """
+    s = size.strip().lower()
+    if "x" in s:
+        try:
+            w_str, h_str = s.split("x", 1)
+            w, h = int(w_str), int(h_str)
+        except ValueError:
+            return None
+        from math import gcd
+        g = gcd(w, h) or 1
+        return f"{w // g}:{h // g}"
+    if ":" in size:
+        return size
+    return None
+
+
 def _build_request(provider: str, prompt: str, model: str,
                    size: str | None, quality: str | None) -> tuple[str, dict, dict]:
     if provider == "openrouter":
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
                    "Content-Type": "application/json"}
-        payload = {"model": model, "messages": [{"role": "user", "content": prompt}]}
+        payload: dict = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "modalities": ["image", "text"],
+        }
+        image_config: dict = {}
+        if size:
+            ar = _size_to_aspect_ratio(size)
+            if ar:
+                image_config["aspect_ratio"] = ar
+        if quality:
+            mapped = _OR_QUALITY_TO_IMAGE_SIZE.get(quality.lower())
+            if mapped:
+                image_config["image_size"] = mapped
+        if image_config:
+            payload["image_config"] = image_config
         return url, headers, payload
 
     if provider == "gemini":

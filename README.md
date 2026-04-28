@@ -1,3 +1,5 @@
+![imagegen-cli banner](./banner.png)
+
 # imagegen
 
 A tiny one-file CLI for generating images across OpenAI, OpenRouter, and Google Gemini — best-effort support for any image model. One command, no SDK, no organization verification (when using OpenRouter).
